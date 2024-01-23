@@ -151,10 +151,13 @@ The collide function is designed to handle the collision between two objects. It
 3. Velocity of the First Object
 4. Velocity of the Second Object
 
-If a collision occurs, update the velocities of the two objects using the elasticity formula:
-    $$vel1_{new}=\frac{(e+1)⋅vel1+vel2⋅(1−e)}{2} $$​
-    $$vel2_{new}=\frac{vel1⋅(1−e)+(1+e)⋅vel2}{2} $$
-The coefficient of restitution $e$ (`ELASTICITY_COEFFICIENT`) determines the elasticity of the collision, affecting how much kinetic energy is retained after the collision.
+The velocities of the two objects are updated using the collision formula based on the conservation of linear momentum and kinetic energy.
+
+The updated velocities are calculated using the following formulas:
+
+$$vel1_{new}=vel1− \frac{∑(vel1−vel2)⋅(pos1−pos2)}{∑(pos1−pos2)^2} ⋅ (pos1−pos2)$$
+
+$$vel2_{new} = vel2 − \frac{∑(vel2−vel1)⋅(pos2−pos1)}{∑(pos2−pos1)^2} ⋅ (pos2−pos1)$$
 
 
 Within the primary simulation loop, the collision detection process involves examining each particle to determine if it is colliding with any other particle. During this process, the velocities of the involved particles are updated to simulate the effects of the collision. Given the commutative nature of collisions (i.e., the collision between particle 1 and particle 2 is equivalent to particle 2 colliding with particle 1), we optimize the collision-checking procedure.
