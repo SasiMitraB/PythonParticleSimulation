@@ -13,9 +13,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
-number_of_balls = 1000
+number_of_balls = 5000
 dimensions = np.asarray([500,500])
-number_of_frames = 2000
+number_of_frames = 1000
 delta_t = 1 # Update with the actual time step
 
 
@@ -48,7 +48,7 @@ class Ball:
     def __init__(self, position, velocity, acceleration):
         # Taking Position, velocity, acceleration as inputs and making them object variables
         self.pos = np.asarray(position)
-        self.vel = np.asarray(velocity) 
+        self.vel = np.asarray(velocity) * 10
         self.acc = acceleration
 
     def check_wall_collision(self):
@@ -80,6 +80,7 @@ def updateParameters(position, velocity, acceleration):
     position = position + velocity * delta_t
     return position, velocity, acceleration
 
+
 #Collision Logic for the Particles.
 @jit(nopython=True)
 def collide(pos1, pos2, vel1, vel2):
@@ -103,28 +104,27 @@ def collide(pos1, pos2, vel1, vel2):
     - Check if a collision occurs (distance is less than or equal to COLLISION_DISTANCE):
       if r <= COLLISION_DISTANCE:
         - Update velocities using collision formula:
-          vel1_new = ((ELASTICITY_COEFFICIENT + 1) * vel1 + vel2 * (1 - ELASTICITY_COEFFICIENT)) / 2
-          vel2_new = (vel1 * (1 - ELASTICITY_COEFFICIENT) + (1 + ELASTICITY_COEFFICIENT) * vel2) / 2
+        vel1_new = vel1 - np.sum((vel1 - vel2) * (pos1 - pos2)) * (pos1 - pos2) / np.sum((pos1 - pos2)**2)
+        vel2_new = vel2 - np.sum((vel2 - vel1) * (pos2 - pos1)) * (pos2 - pos1) / np.sum((pos2 - pos1)**2) 
 
     The collision formula updates the velocities of two objects after a collision
-    based on the conservation of linear momentum and kinetic energy. The coefficient
-    of restitution 'e' determines the elasticity of the collision.
+    based on the conservation of linear momentum and kinetic energy.
     """
     
-    # Named constants
-    COLLISION_DISTANCE = 100
-    
+    # Named constant
+    COLLISION_DISTANCE = 25
+
     # Calculate the distance between the two objects manually
     delta_pos = pos1 - pos2
-    r = (np.sum(delta_pos**2))
+    r = np.sum(delta_pos**2)
+    
 
     # Check if a collision occurs (distance is less than or equal to COLLISION_DISTANCE)
     if r <= COLLISION_DISTANCE:
-        ELASTICITY_COEFFICIENT = 1
-        # Update velocities using collision formula
-        vel1_new = ((ELASTICITY_COEFFICIENT + 1) * vel1 + vel2 * (1 - ELASTICITY_COEFFICIENT)) / 2
-        vel2_new = (vel1 * (1 - ELASTICITY_COEFFICIENT) + (1 + ELASTICITY_COEFFICIENT) * vel2) / 2
-
+        # Use element-wise multiplication and summation instead of np.inner
+        vel1_new = vel1 - np.sum((vel1 - vel2) * (pos1 - pos2)) * (pos1 - pos2) / np.sum((pos1 - pos2)**2)
+        vel2_new = vel2 - np.sum((vel2 - vel1) * (pos2 - pos1)) * (pos2 - pos1) / np.sum((pos2 - pos1)**2) 
+        
         return vel1_new, vel2_new
 
     return vel1, vel2
@@ -251,11 +251,11 @@ def draw_frame_vels(frame_count):
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
     # Scatter plot of positions
-    axs[0].scatter(ball_positions[:, 0], ball_positions[:, 1], s = 0.5)
+    axs[0].scatter(ball_positions[:, 0], ball_positions[:, 1])
     axs[0].set_title('Ball Positions')
 
     # Histogram of velocities
-    axs[1].hist(ball_velocities, bins=1000, color='skyblue', edgecolor='black')
+    axs[1].hist(ball_velocities, bins=number_of_balls, color='skyblue', edgecolor='black')
     axs[1].set_title('Velocities Histogram')
 
     # Adjust layout to prevent clipping of titles
@@ -312,7 +312,7 @@ zfilll = len(str(number_of_balls)) + 2
 for frame_count in range(number_of_frames):
     start_time = time.time()  # Record the start time for the frame generation
     
-    draw_frame_png(frame_count)
+    draw_frame_vels(frame_count)
 
     end_time = time.time()  # Record the end time for the frame generation
     duration = end_time - start_time
