@@ -10,12 +10,12 @@ import pandas as pd
 from numba import jit, njit
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 
-number_of_balls = 5000
-dimensions = np.asarray([500,500])
-number_of_frames = 1000
+
+number_of_balls = 500
+dimensions = np.asarray([500,500, 500])
+number_of_frames = 100
 delta_t = 1 # Update with the actual time step
 
 
@@ -159,8 +159,6 @@ def draw_frame_txt(frame_count):
     filename = f"animation/{str(frame_count).zfill(zfilll)}.txt"
     np.savetxt(filename, ball_positions)
 
-import numpy as np
-import matplotlib.pyplot as plt
 
 def draw_frame_png(frame_count):
     # Collect positions for all balls in this frame
@@ -196,18 +194,17 @@ def draw_frame_3d(frame_count):
     ball_positions = np.zeros((number_of_balls, 3))
     
     for i in range(number_of_balls):
-
-        if i==(1-number_of_balls):
+        ball_positions[i] = my_balls[i].pos
+        if i == (1 - number_of_balls):
             pass
         else:
-            for j in range(i+1, number_of_balls):
-                a,b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel)
+            for j in range(i + 1, number_of_balls):
+                a, b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel)
                 my_balls[i].vel = a
                 my_balls[j].vel = b
 
         my_balls[i].update()
-        ball_positions[i] = my_balls[i].pos
-
+    
 
     # Plot and save ball positions as a PNG file
     filename = f"animation/{str(frame_count).zfill(zfilll)}.png"
@@ -223,7 +220,56 @@ def draw_frame_3d(frame_count):
     # Clear the plot for the next frame
     plt.close(fig)
     
+
+
+def draw_3d_vels_and_plot(frame_count):
+    # Collect positions and velocities for all balls in this frame
+    ball_positions = np.zeros((number_of_balls, 3))
+    ball_velocities = np.zeros(number_of_balls)
     
+    for i in range(number_of_balls):
+        ball_positions[i] = my_balls[i].pos
+        ball_velocities[i] = calculate_norm(my_balls[i].vel)
+        if i == (1 - number_of_balls):
+            pass
+        else:
+            for j in range(i + 1, number_of_balls):
+                a, b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel)
+                my_balls[i].vel = a
+                my_balls[j].vel = b
+
+        my_balls[i].update()
+    
+    # Plot and save ball positions and velocities as a PNG file
+    filename = f"animation/{str(frame_count).zfill(zfilll)}.png"
+    
+    # Create a subplot with 1 row and 2 columns
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+    # Scatter plot of positions
+    ax3d = fig.add_subplot(121, projection='3d')
+    ax3d.scatter(ball_positions[:, 0], ball_positions[:, 1], ball_positions[:, 2])
+    ax3d.set_title('Ball Positions')
+    ax3d.set_xlabel('X')
+    ax3d.set_ylabel('Y')
+    ax3d.set_zlabel('Z')
+
+    # Histogram of velocities
+    axs[1].hist(ball_velocities, bins=number_of_balls, color='skyblue', edgecolor='black')
+    axs[1].set_title('Velocities Histogram')
+    axs[1].set_xlabel('Velocity')
+    axs[1].set_ylabel('Frequency')
+
+    # Adjust layout to prevent clipping of titles
+    plt.tight_layout()
+
+    # Save the plot as a PNG file
+    plt.savefig(filename)
+
+    # Clear the plot for the next frame
+    plt.close(fig)
+
+
 
 def draw_frame_vels(frame_count):
     # Collect positions and velocities for all balls in this frame
@@ -276,9 +322,9 @@ my_balls = []
 # Iterating 'number_of_balls' times and making a new ball, and appending it to the list
 for i in range(number_of_balls):
     # Randomly generating position and velocity
-    pos = [random.randint(0, dimensions[0]), random.randint(0, dimensions[1])]
-    vel = [random.random(), random.random()]
-    acc = np.asarray([0,0])
+    pos = [random.randint(0, dimensions[0]), random.randint(0, dimensions[1]), random.randint(0, dimensions[2])]
+    vel = [random.random(), random.random(), random.random()]
+    acc = np.asarray([0,0, 0])
     
     # Making a ball
     i_th_ball = Ball(pos, vel, acc )  # Creating an instance of the Ball class
@@ -312,7 +358,7 @@ zfilll = len(str(number_of_balls)) + 2
 for frame_count in range(number_of_frames):
     start_time = time.time()  # Record the start time for the frame generation
     
-    draw_frame_vels(frame_count)
+    draw_3d_vels_and_plot(frame_count)
 
     end_time = time.time()  # Record the end time for the frame generation
     duration = end_time - start_time

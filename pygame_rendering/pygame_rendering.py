@@ -1,23 +1,20 @@
-from animated_plots import generate_animation
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy import random
 import pandas as pd
 from numba import jit
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
 import pygame
 
 
 
 
 
-number_of_balls = 1000
-dimensions = [1920,1080]
-number_of_frames = 10000
-delta_t = 10 # Update with the actual time step
+number_of_balls = 300
+dimensions = np.asarray([600,600])
 
+delta_t = 5 # Update with the actual time step
+#Bug Discovered. The particles go into the big ball if the timestep is bigger than 1
 
 class Ball:
     """
@@ -45,12 +42,12 @@ class Ball:
     Author: Sasi Mitra Behara
     Date: December 28, 2023
     """
-    def __init__(self, position, velocity, acceleration, size):
+    def __init__(self, position, velocity, acceleration, radius):
         # Taking Position, velocity, acceleration as inputs and making them object variables
         self.pos = np.asarray(position)
-        self.vel = np.asarray(velocity)
+        self.vel = np.asarray(velocity)*5
         self.acc = acceleration
-        self.size = size
+        self.radius = radius
         self.color = np.random.randint(0, 256, size=3)
 
 
@@ -59,11 +56,29 @@ class Ball:
         """
         Update the position, velocity, and handle collisions.
         """
+        self.check_wall_collision()
         self.pos, self.vel, self.acc =  updateParameters(self.pos, self.vel, self.acc)
+    
+    def check_wall_collision(self):
+        '''Check if Collisions occurs with the walls and implements elastic collision with the walls'''
+        self.vel = wall_collision(self.pos, self.vel, self.radius)
+
         
     def display(self):
-        pygame.draw.circle(win, self.color, self.pos, self.size)
+        pygame.draw.circle(win, self.color, self.pos, self.radius)
         
+        
+@jit(nopython = True)       
+def wall_collision(position, velocity, radius):
+    # Find indices where position is less than or equal to 0 or greater than or equal to dimensions
+    below_zero = position <= (0 + radius)
+    above_dimensions = position >= (dimensions - radius)
+
+    # Update velocities for the corresponding dimensions
+    velocity[below_zero] = -velocity[below_zero]
+    velocity[above_dimensions] = -velocity[above_dimensions]
+
+    return velocity        
 
 @jit(nopython=True)
 def updateParameters(position, velocity, acceleration):
@@ -71,9 +86,9 @@ def updateParameters(position, velocity, acceleration):
     position = position + velocity * delta_t
     return position, velocity, acceleration
 
-#Collision Logic for the Particles.
+# Collision Logic for the Particles
 @jit(nopython=True)
-def collide(pos1, pos2, vel1, vel2):
+def collide(pos1, pos2, vel1, vel2, r1, r2):
     """
     Handle collision between two objects.
 
@@ -82,6 +97,8 @@ def collide(pos1, pos2, vel1, vel2):
     - pos2 (numpy.ndarray): Position of the second object.
     - vel1 (numpy.ndarray): Velocity of the first object.
     - vel2 (numpy.ndarray): Velocity of the second object.
+    - r1 (float): Radius of the first object.
+    - r2 (float): Radius of the second object.
 
     Returns:
     - numpy.ndarray: Updated velocity of the first object.
@@ -89,52 +106,46 @@ def collide(pos1, pos2, vel1, vel2):
 
     Collision Formula:
     - Calculate the distance between the two objects manually using Euclidean norm:
-      r = sqrt(sum((pos1 - pos2)**2))
+      r = np.sqrt(np.sum((pos1 - pos2)**2))
 
     - Check if a collision occurs (distance is less than or equal to COLLISION_DISTANCE):
       if r <= COLLISION_DISTANCE:
         - Update velocities using collision formula:
-          vel1_new = ((ELASTICITY_COEFFICIENT + 1) * vel1 + vel2 * (1 - ELASTICITY_COEFFICIENT)) / 2
-          vel2_new = (vel1 * (1 - ELASTICITY_COEFFICIENT) + (1 + ELASTICITY_COEFFICIENT) * vel2) / 2
+        vel1_new = vel1 - 2 * (np.sum((vel1 - vel2) * (pos1 - pos2)) / np.sum((pos1 - pos2)**2)) * (pos1 - pos2) * (r2**2 / (r1**2 + r2**2))
+        vel2_new = vel2 - 2 * (np.sum((vel2 - vel1) * (pos2 - pos1)) / np.sum((pos2 - pos1)**2)) * (pos2 - pos1) * (r1**2 / (r1**2 + r2**2))
 
     The collision formula updates the velocities of two objects after a collision
-    based on the conservation of linear momentum and kinetic energy. The coefficient
-    of restitution 'e' determines the elasticity of the collision.
+    based on the conservation of linear momentum and kinetic energy.
     """
     
-    # Named constants
-    COLLISION_DISTANCE = 200
-    
+    # Named constant
+    COLLISION_DISTANCE = (r1 + r2)**2
+
     # Calculate the distance between the two objects manually
     delta_pos = pos1 - pos2
-    r = np.sqrt(np.sum(delta_pos**2))
+    r = np.sum(delta_pos**2)
 
     # Check if a collision occurs (distance is less than or equal to COLLISION_DISTANCE)
     if r <= COLLISION_DISTANCE:
-        ELASTICITY_COEFFICIENT = 1
         # Update velocities using collision formula
-        vel1_new = ((ELASTICITY_COEFFICIENT + 1) * vel1 + vel2 * (1 - ELASTICITY_COEFFICIENT)) / 2
-        vel2_new = (vel1 * (1 - ELASTICITY_COEFFICIENT) + (1 + ELASTICITY_COEFFICIENT) * vel2) / 2
+        vel1_new = vel1 - 2 * (np.sum((vel1 - vel2) * delta_pos) / np.sum(delta_pos**2)) * delta_pos * (r2**2 / (r1**2 + r2**2))
+        vel2_new = vel2 - 2 * (np.sum((vel2 - vel1) * (-delta_pos)) / np.sum(delta_pos**2)) * (-delta_pos) * (r1**2 / (r1**2 + r2**2))
 
         return vel1_new, vel2_new
 
     return vel1, vel2
 
-def collide_parallel(i):
-    ball = my_balls[i]
-    for j in range(i + 1, number_of_balls):
-        a, b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel)
-        my_balls[i].vel = a
-        my_balls[j].vel = b
-        
+  
+@jit(nopython = True)        
+def calculate_norm(array):
+    return np.sqrt(np.sum(array**2))      
         
 #########################The Drawing Function########################
 
 
 def draw(frame_count): #This is the function we'll be using to draw each frame.
     win.fill((0,0,0))
-    start_time = time.time()  # Record the start time for the frame generation
-    
+
     
     for i in range(number_of_balls):
 
@@ -142,7 +153,7 @@ def draw(frame_count): #This is the function we'll be using to draw each frame.
             pass
         else:
             for j in range(i+1, number_of_balls):
-                a,b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel)
+                a,b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel, my_balls[i].radius, my_balls[j].radius)
                 my_balls[i].vel = a
                 my_balls[j].vel = b
 
@@ -151,9 +162,27 @@ def draw(frame_count): #This is the function we'll be using to draw each frame.
         my_balls[i].display()
 
 
-    end_time = time.time()  # Record the end time for the frame generation
-    duration = end_time - start_time
-    print(f"Frame number {frame_count + 1} has been generated in {duration:.4f} seconds.")
+
+
+def draw_path(frame_count): #This is the function we'll be using to draw each frame.
+    
+    
+    for i in range(number_of_balls):
+
+        if i==(1-number_of_balls):
+            pass
+        else:
+            for j in range(i+1, number_of_balls):
+                a,b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel, my_balls[i].radius, my_balls[j].radius)
+                my_balls[i].vel = a
+                my_balls[j].vel = b
+
+        my_balls[i].update()
+        
+        #my_balls[i].display()
+    #my_balls[0].display()
+    pygame.draw.circle(win, my_balls[0].color, my_balls[0].pos, 5)
+
 
 
 ################################Generating the Ball Objects ##################################
@@ -161,15 +190,29 @@ def draw(frame_count): #This is the function we'll be using to draw each frame.
 # Making a list called my_balls where the balls are stored
 my_balls = []
 
+big_ball_check = 0
 # Iterating 'number_of_balls' times and making a new ball, and appending it to the list
 for i in range(number_of_balls):
-    
+    if big_ball_check == 0:
+        big_pos = dimensions/2
+        vel = [0.0,0.0]
+        acc = np.asarray([0,0])
+        big_radius = 15
+        big_ball = Ball(big_pos, vel, acc, big_radius) # Creating an instance of the big ball
+        my_balls.append(big_ball)
+        big_ball_check += 1
+        mass = 0.1
 
     # Randomly generating position and velocity
     pos = [random.randint(0, dimensions[0]), random.randint(0, dimensions[1])]
+    while calculate_norm(pos - big_pos) <= big_radius:
+        pos = [random.randint(0, dimensions[0]), random.randint(0, dimensions[1])]
+        
+
     vel = [random.random(), random.random()]
     acc = np.asarray([0,0])
     radius = 2
+    mass = 0.05
     # Making a ball
     i_th_ball = Ball(pos, vel, acc, radius )  # Creating an instance of the Ball class
     
@@ -178,19 +221,6 @@ for i in range(number_of_balls):
 
 
 ################################ The Actual Simulation ##################################
-
-#######Deleting all the files in animation folder 
-folder_path = 'animation'
-
-
-
-#Simulating and generating each individual plot
-
-
-
-
-
-
 
 pygame.init() #Intializing the pygame engine
 
@@ -218,9 +248,20 @@ while run: #As long as this while loop is true, we can see the window
             pass
     #Drawing to the screen each iteration
     frame_count += 1
+    
+    
+    start_time = time.time()  # Record the start time for the frame generation
     draw(frame_count)
+    #draw_path(frame_count) # This is for showing the path of the big ball
+
+
+    end_time = time.time()  # Record the end time for the frame generation
+  
     #Updating the display to reflect the changes made in the new frame
     pygame.display.flip()
+    duration = end_time - start_time
+    
+    print(f"Frame number {frame_count + 1} has been generated in {duration:.4f} seconds.")
     #Telling the clock to pause the code for 1/60th of a second, and then go ahead
     fpsClock.tick(60)
 
