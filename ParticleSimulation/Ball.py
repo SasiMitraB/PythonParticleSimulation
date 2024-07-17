@@ -28,7 +28,7 @@ class Ball:
     Author: Sasi Mitra Behara
     Date: December 28, 2023
     """
-    def __init__(self, position, velocity, acceleration, radius, dimensions, delta_t):
+    def __init__(self, position, velocity, acceleration, radius, dimensions, delta_t, gridx_size, gridy_size):
         # Taking Position, velocity, acceleration as inputs and making them object variables
         self.pos = np.asarray(position)
         self.vel = np.asarray(velocity) * 10
@@ -36,6 +36,10 @@ class Ball:
         self.r = radius
         self.dimensions = dimensions
         self.delta_t = delta_t
+        self.gridx_size = gridx_size
+        self.gridy_size = gridy_size
+        self.gridx = self.pos[0]//gridx_size
+        self.gridy = self.pos[1]//gridy_size
 
     def check_wall_collision(self):
         '''Check if Collisions occurs with the walls and implements elastic collision with the walls'''
@@ -48,6 +52,8 @@ class Ball:
         """
         self.check_wall_collision()
         self.pos, self.vel, self.acc =  updateParameters(self.pos, self.vel, self.acc, self.delta_t)
+        self.gridx = self.pos[0]//self.gridx_size
+        self.gridy = self.pos[1]//self.gridy_size
 
 
 
@@ -174,3 +180,5 @@ def collide(pos1, pos2, vel1, vel2, r1, r2):
 @jit(nopython = True)        
 def calculate_norm(array):
     return np.sqrt(np.sum(array**2))
+
+

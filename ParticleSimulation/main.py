@@ -13,13 +13,18 @@ import time
 
 
 
-number_of_balls = 100
-dimensions = np.asarray([500,500])
-number_of_frames = 200
+number_of_balls = 5000
+dimensions = np.asarray([1000,1000])
+number_of_frames = 100
 delta_t = 1 # Update with the actual time step
 
         
 ######################## Drawing Each Frame ##########################
+
+#Attempting to implement Grid Based Model
+
+
+
 @jit(forceobj = True)
 def calculate_frame(frame_count):
     # Collect positions for all balls in this frame
@@ -27,9 +32,10 @@ def calculate_frame(frame_count):
     ball_velocities = np.zeros((number_of_balls))
     for i in range(number_of_balls):
         for j in range(i + 1, number_of_balls):
-            a, b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel, my_balls[i].r, my_balls[j].r)
-            my_balls[i].vel = a
-            my_balls[j].vel = b
+            if my_balls[i].gridx == my_balls[j].gridx and my_balls[j].gridy == my_balls[i].gridy:
+                a, b = collide(my_balls[i].pos, my_balls[j].pos, my_balls[i].vel, my_balls[j].vel, my_balls[i].r, my_balls[j].r)
+                my_balls[i].vel = a
+                my_balls[j].vel = b
 
         my_balls[i].update()
         ball_positions[i] = my_balls[i].pos[:2]  # Take only the x and y components
@@ -54,7 +60,11 @@ for i in range(number_of_balls):
     acc = np.asarray([0,0])
     
     # Making a ball
-    i_th_ball = Ball(pos, vel, acc, 5, dimensions, delta_t)  # Creating an instance of the Ball class
+    i_th_ball = Ball(pos, vel, acc, 5, 
+                     dimensions=dimensions,
+                     delta_t=delta_t,
+                     gridx_size=10,
+                     gridy_size=10)  # Creating an instance of the Ball class
     
     # Appending the ball to the list
     my_balls.append(i_th_ball)
