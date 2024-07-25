@@ -116,7 +116,8 @@ def update(frame):
         positions_array[frame, :, 0],
         positions_array[frame, :, 1],
         color = 'blue',
-        label='Position'
+        label='Position',
+        s = 0.5
     )
     
 

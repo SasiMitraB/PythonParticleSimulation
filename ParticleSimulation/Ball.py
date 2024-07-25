@@ -74,7 +74,8 @@ def wall_collision(position, velocity, dimensions):
 def compute_acceleration(position):
     # Placeholder function to compute acceleration based on position
     # Modify this function based on your specific force model
-    return np.zeros_like(position)
+    acceleration = np.asarray([0, -1])
+    return acceleration
 
 @jit(nopython=True)
 def rk4_step(position, velocity, acceleration, delta_t):
