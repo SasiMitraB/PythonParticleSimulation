@@ -10,7 +10,7 @@ import pygame
 
 
 
-number_of_balls = 300
+number_of_balls = 300 # Number of balls in the simulation
 dimensions = np.asarray([600,600])
 
 delta_t = 5 # Update with the actual time step
